@@ -9,7 +9,15 @@ const NEON_GLOW = {
   account: "0 0 24px #FF2D7888, 0 0 48px #FF2D7833",
 };
 
-const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || "";
+const GROQ_KEYS = [
+  import.meta.env.VITE_GROQ_API_KEY,
+  import.meta.env.VITE_GROQ_API_KEY_2,
+  import.meta.env.VITE_GROQ_API_KEY_3,
+  import.meta.env.VITE_GROQ_API_KEY_4,
+  import.meta.env.VITE_GROQ_API_KEY_5,
+].filter(Boolean);
+
+const YOUTUBE_KEY = import.meta.env.VITE_YOUTUBE_API_KEY || "";
 
 function getUsage() {
   try {
@@ -29,6 +37,46 @@ function saveUsage(usage) {
       month: new Date().toISOString().slice(0, 7),
     }));
   } catch { }
+}
+
+let groqKeyIndex = 0;
+function getNextGroqKey() {
+  const key = GROQ_KEYS[groqKeyIndex % GROQ_KEYS.length];
+  groqKeyIndex++;
+  return key;
+}
+
+async function groqQuery(prompt) {
+  for (let attempt = 0; attempt < GROQ_KEYS.length; attempt++) {
+    const key = getNextGroqKey();
+    try {
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${key}`,
+        },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          messages: [{ role: "user", content: prompt }],
+          max_tokens: 500,
+          temperature: 0.3,
+        }),
+      });
+      if (res.status === 429) continue;
+      const data = await res.json();
+      return data.choices?.[0]?.message?.content || "";
+    } catch { continue; }
+  }
+  throw new Error("All Groq keys exhausted");
+}
+
+async function youtubeSearch(query, type) {
+  const searchType = type === "account" ? "channel" : "video";
+  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=${searchType}&maxResults=5&key=${YOUTUBE_KEY}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  return data.items || [];
 }
 
 function PaywallModal({ lang, neon, glow, typeKey, onClose }) {
@@ -173,47 +221,56 @@ export default function App() {
     setResults(null);
     setError("");
 
-    const prompt = `You are an expert at identifying songs, videos, and social media accounts from vague descriptions.
-The user is looking for a ${typeKey}. Their description: "${query}"
+    try {
+      // Step 1: Groq converts description to search query
+      const searchQueryPrompt = `The user is looking for a ${typeKey}. Their description: "${query}"
+Generate 1 short YouTube search query (max 6 words) to find this ${typeKey}.
+Respond with ONLY the search query, nothing else.`;
 
-Based on your knowledge, suggest the most likely matches.
-Respond ONLY with valid JSON (no markdown, no extra text):
+      const searchQuery = await groqQuery(searchQueryPrompt);
+      const cleanQuery = searchQuery.trim().replace(/["']/g, "");
+
+      // Step 2: YouTube searches for real results
+      const ytResults = await youtubeSearch(cleanQuery, typeKey);
+
+      if (!ytResults.length) throw new Error("no results");
+
+      // Step 3: Groq picks the best match and explains
+      const matchPrompt = `User was looking for a ${typeKey} with description: "${query}"
+YouTube search for "${cleanQuery}" returned these results:
+${ytResults.map((item, i) => `${i + 1}. "${item.snippet?.title}" by ${item.snippet?.channelTitle}`).join("\n")}
+
+Which of these best matches the description? Respond in ${isTR ? "Turkish" : "English"} with ONLY this JSON:
 {
   "matches": [
     {
-      "title": "exact name",
-      "artist_or_creator": "artist or creator name",
-      "year": "year if known or empty string",
-      "why": "why this matches the description in 1 sentence",
-      "direct_link": "for songs: https://open.spotify.com/search/SONGNAME or youtube watch URL; for videos: youtube watch URL; for accounts: profile URL on TikTok/Instagram/YouTube",
-      "platform": "Spotify / YouTube / TikTok / Instagram"
+      "title": "video/channel title",
+      "artist_or_creator": "channel name",
+      "year": "year from description or empty",
+      "why": "why this matches in 1 sentence",
+      "video_id": "the YouTube video or channel id from the list",
+      "platform": "YouTube"
     }
   ],
-  "tips": "one helpful tip to narrow it down"
+  "tips": "one tip to narrow it down"
 }
-Give 3-5 matches ordered by likelihood. Respond in ${isTR ? "Turkish" : "English"}.`;
+Include top 3 matches.`;
 
-    try {
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${GROQ_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
-          messages: [{ role: "user", content: prompt }],
-          max_tokens: 1500,
-          temperature: 0.3,
-        }),
-      });
-
-      const data = await res.json();
-      const text = data.choices?.[0]?.message?.content || "";
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      const matchResponse = await groqQuery(matchPrompt);
+      const jsonMatch = matchResponse.match(/\{[\s\S]*\}/);
       if (!jsonMatch) throw new Error("no json");
       const parsed = JSON.parse(jsonMatch[0]);
-      if (!parsed.matches?.length) throw new Error("empty");
+
+      // Add real YouTube links
+      parsed.matches = parsed.matches?.map((m, i) => {
+        const ytItem = ytResults[i];
+        const id = ytItem?.id?.videoId || ytItem?.id?.channelId || "";
+        const isChannel = typeKey === "account";
+        m.direct_link = isChannel
+          ? `https://www.youtube.com/channel/${id}`
+          : `https://www.youtube.com/watch?v=${id}`;
+        return m;
+      });
 
       setResults(parsed);
       const newUsage = { ...usage, [typeKey]: usedCount + 1 };
@@ -265,8 +322,8 @@ Give 3-5 matches ordered by likelihood. Respond in ${isTR ? "Turkish" : "English
           </h1>
           <p style={{ color: "#8888AA", fontSize: 15, margin: 0, lineHeight: 1.7 }}>
             {isTR
-              ? "Adını unuttuğun şarkıyı, videoyu ya da hesabı tarif et — AI bulsun."
-              : "Describe the song, video, or account you can't name — AI will find it."}
+              ? "Adını unuttuğun şarkıyı, videoyu ya da hesabı tarif et — AI YouTube'da arasın."
+              : "Describe the song, video, or account you can't name — AI searches YouTube for you."}
           </p>
         </div>
 
@@ -358,7 +415,7 @@ Give 3-5 matches ordered by likelihood. Respond in ${isTR ? "Turkish" : "English
           <div style={{ textAlign: "center", padding: "40px 0" }}>
             <div style={{ fontSize: 34, marginBottom: 10, display: "inline-block", animation: "spin 1s linear infinite" }}>⟳</div>
             <p style={{ color: "#8888AA", fontSize: 14, margin: 0 }}>
-              {isTR ? "AI arıyor, biraz bekle..." : "AI is searching, please wait..."}
+              {isTR ? "YouTube'da aranıyor..." : "Searching YouTube..."}
             </p>
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           </div>
@@ -406,9 +463,7 @@ Give 3-5 matches ordered by likelihood. Respond in ${isTR ? "Turkish" : "English
                           {i === 0 && (
                             <span style={{ background: neon, color: "#080810", fontSize: 10, fontWeight: 800, padding: "2px 8px", borderRadius: 100 }}>#1</span>
                           )}
-                          {m.platform && (
-                            <span style={{ background: "#FFFFFF0D", color: "#8888AA", fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 100 }}>{m.platform}</span>
-                          )}
+                          <span style={{ background: "#FFFFFF0D", color: "#8888AA", fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 100 }}>YouTube</span>
                           <span style={{ fontWeight: 700, fontSize: 15, color: "#F0F0FF" }}>{m.title}</span>
                         </div>
                         {m.artist_or_creator && (
@@ -434,7 +489,7 @@ Give 3-5 matches ordered by likelihood. Respond in ${isTR ? "Turkish" : "English
               </div>
             )}
             <p style={{ textAlign: "center", fontSize: 11, color: "#FFFFFF22", marginTop: 18 }}>
-              {isTR ? "Sonuçlar AI analizi ile bulundu." : "Results found via AI analysis."}
+              {isTR ? "Sonuçlar YouTube araması + AI analizi ile bulundu." : "Results found via YouTube search + AI analysis."}
             </p>
           </div>
         )}
