@@ -321,7 +321,7 @@ function PaywallModal({ t, neon, glow, typeKey, onClose }) {
 }
 
 export default function App() {
-  const [lang, setLang] = useState("TR");
+  const [lang, setLang] = useState("EN");
   const [showLangMenu, setShowLangMenu] = useState(false);
   const [typeIdx, setTypeIdx] = useState(0);
   const [query, setQuery] = useState("");
