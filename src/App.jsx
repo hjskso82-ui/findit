@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const FREE_LIMITS = { song: 1, video: 5, account: 3 };
 const TYPE_KEYS = ["song", "video", "account"];
@@ -10,6 +10,18 @@ const NEON_GLOW = {
 };
 
 const ANTHROPIC_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY || "";
+
+const CHECKOUT_URLS = {
+  pack: "https://findit-store.lemonsqueezy.com/checkout/buy/e07bcbec-e37f-406c-b27f-3018265f4e9c",
+  sub: "https://findit-store.lemonsqueezy.com/checkout/buy/d5bde27d-da56-49ee-8643-7fd9c54b1f1f",
+};
+
+function isPremium() {
+  try { return localStorage.getItem("findit_premium") === "true"; } catch { return false; }
+}
+function markPremium() {
+  try { localStorage.setItem("findit_premium", "true"); } catch { }
+}
 
 const LANGS = {
   TR: { name: "Türkçe", label: "Türkçe" },
@@ -305,11 +317,13 @@ function PaywallModal({ t, neon, glow, typeKey, onClose }) {
           </div>
         </div>
 
-        <button style={{
-          width: "100%", padding: "15px", borderRadius: 12, border: "none",
-          background: neon, color: "#080810", fontWeight: 800, fontSize: 16,
-          cursor: "pointer", boxShadow: glow, marginBottom: 10,
-        }}>{t.paywall.cta}</button>
+        <a href={CHECKOUT_URLS[selected]} style={{ textDecoration: "none", display: "block" }}>
+          <button style={{
+            width: "100%", padding: "15px", borderRadius: 12, border: "none",
+            background: neon, color: "#080810", fontWeight: 800, fontSize: 16,
+            cursor: "pointer", boxShadow: glow, marginBottom: 10,
+          }}>{t.paywall.cta}</button>
+        </a>
         <p style={{ textAlign: "center", fontSize: 11, color: "#FFFFFF33", margin: "0 0 10px" }}>{t.paywall.secure}</p>
         <button onClick={onClose} style={{
           width: "100%", padding: "12px", borderRadius: 12,
@@ -330,6 +344,16 @@ export default function App() {
   const [error, setError] = useState("");
   const [usage, setUsage] = useState(() => getUsage());
   const [showPaywall, setShowPaywall] = useState(false);
+  const [premium, setPremiumFlag] = useState(() => isPremium());
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("premium") === "1") {
+      markPremium();
+      setPremiumFlag(true);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
 
   const t = TEXT[lang];
   const typeKey = TYPE_KEYS[typeIdx];
@@ -342,7 +366,7 @@ export default function App() {
 
   async function handleFind() {
     if (!query.trim() || loading) return;
-    if (remaining <= 0) { setShowPaywall(true); return; }
+    if (!premium && remaining <= 0) { setShowPaywall(true); return; }
 
     setLoading(true);
     setResults(null);
@@ -474,7 +498,7 @@ Give 3-5 matches ordered by likelihood. Respond in ${LANGS[lang].name}.`,
                 <span style={{
                   marginLeft: 6, fontSize: 11, fontWeight: 700,
                   color: rem === 0 ? "#FF2D78" : i === typeIdx ? NEON[tk] : "#8888AA66",
-                }}>{rem}/{FREE_LIMITS[tk]}</span>
+                }}>{premium ? "∞" : `${rem}/${FREE_LIMITS[tk]}`}</span>
               </button>
             );
           })}
@@ -513,16 +537,20 @@ Give 3-5 matches ordered by likelihood. Respond in ${LANGS[lang].name}.`,
         </div>
 
         <div style={{ textAlign: "center", marginBottom: 28 }}>
-          <div style={{ display: "flex", justifyContent: "center", gap: 5, marginBottom: 6 }}>
-            {[...Array(freeLimit)].map((_, i) => (
-              <div key={i} style={{
-                width: 7, height: 7, borderRadius: "50%",
-                background: i < usedCount ? "#FFFFFF15" : neon,
-                boxShadow: i < usedCount ? "none" : glow, transition: "all 0.4s",
-              }} />
-            ))}
-          </div>
-          {remaining > 0 ? (
+          {!premium && (
+            <div style={{ display: "flex", justifyContent: "center", gap: 5, marginBottom: 6 }}>
+              {[...Array(freeLimit)].map((_, i) => (
+                <div key={i} style={{
+                  width: 7, height: 7, borderRadius: "50%",
+                  background: i < usedCount ? "#FFFFFF15" : neon,
+                  boxShadow: i < usedCount ? "none" : glow, transition: "all 0.4s",
+                }} />
+              ))}
+            </div>
+          )}
+          {premium ? (
+            <span style={{ fontSize: 13, color: neon, fontWeight: 700 }}>✦ Premium</span>
+          ) : remaining > 0 ? (
             <span style={{ fontSize: 13, color: "#8888AA" }}>{t.freeLeft(remaining)}</span>
           ) : (
             <span onClick={() => setShowPaywall(true)} style={{
