@@ -446,7 +446,7 @@ Give 3-5 matches ordered by likelihood. Respond in ${LANGS[lang].name}.`,
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "24px 0" }}>
           <div style={{ fontWeight: 800, fontSize: 20, color: neon, textShadow: glow, transition: "all 0.4s" }}>
-            ◈ FindIt
+            ◈ Zindly
           </div>
           <div style={{ position: "relative" }}>
             <button onClick={() => setShowLangMenu(v => !v)} style={{
