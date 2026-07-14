@@ -12,8 +12,8 @@ const NEON_GLOW = {
 const ANTHROPIC_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY || "";
 
 const CHECKOUT_URLS = {
-  pack: "https://findit-store.lemonsqueezy.com/checkout/buy/e07bcbec-e37f-406c-b27f-3018265f4e9c",
-  sub: "https://findit-store.lemonsqueezy.com/checkout/buy/d5bde27d-da56-49ee-8643-7fd9c54b1f1f",
+  pack: "https://5306379145663.gumroad.com/l/ofdxzi?wanted=true",
+  sub: "https://5306379145663.gumroad.com/l/wbwgj?wanted=true",
 };
 
 function isPremium() {
