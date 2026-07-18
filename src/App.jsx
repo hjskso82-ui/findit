@@ -334,6 +334,36 @@ function PaywallModal({ t, neon, glow, typeKey, onClose }) {
   );
 }
 
+function AdBanner() {
+  const containerRef = useState(() => Math.random().toString(36).slice(2))[0];
+  useEffect(() => {
+    const el = document.getElementById(containerRef);
+    if (!el || el.dataset.loaded) return;
+    el.dataset.loaded = "1";
+    const s1 = document.createElement("script");
+    s1.innerHTML = `atOptions = {'key' : 'a26c83e6e62b68750b3f7cb4d670a455','format' : 'iframe','height' : 250,'width' : 300,'params' : {}};`;
+    const s2 = document.createElement("script");
+    s2.src = "https://www.highperformanceformat.com/a26c83e6e62b68750b3f7cb4d670a455/invoke.js";
+    el.appendChild(s1);
+    el.appendChild(s2);
+  }, [containerRef]);
+  return <div id={containerRef} style={{ display: "flex", justifyContent: "center", margin: "20px 0" }} />;
+}
+
+function NativeBanner() {
+  useEffect(() => {
+    const el = document.getElementById("container-18101e24e7b8b9b9fedef390296dc747");
+    if (!el || el.dataset.loaded) return;
+    el.dataset.loaded = "1";
+    const s = document.createElement("script");
+    s.async = true;
+    s.dataset.cfasync = "false";
+    s.src = "https://pl30421796.effectivecpmnetwork.com/18101e24e7b8b9b9fedef390296dc747/invoke.js";
+    el.appendChild(s);
+  }, []);
+  return <div id="container-18101e24e7b8b9b9fedef390296dc747" style={{ margin: "20px 0" }} />;
+}
+
 export default function App() {
   const [lang, setLang] = useState("EN");
   const [showLangMenu, setShowLangMenu] = useState(false);
@@ -626,6 +656,12 @@ Give 3-5 matches ordered by likelihood. Respond in ${LANGS[lang].name}.`,
                 marginTop: 14, background: `${neon}0D`, border: `1px solid ${neon}1A`,
                 borderRadius: 12, padding: "13px 16px", fontSize: 13, color: "#8888AA", lineHeight: 1.6,
               }}>💡 {results.tips}</div>
+            )}
+            {!premium && (
+              <>
+                <NativeBanner />
+                <AdBanner />
+              </>
             )}
             <p style={{ textAlign: "center", fontSize: 11, color: "#FFFFFF22", marginTop: 18 }}>{t.disclaimer}</p>
           </div>
