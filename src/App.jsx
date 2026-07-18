@@ -364,6 +364,14 @@ function NativeBanner() {
   return <div id="container-18101e24e7b8b9b9fedef390296dc747" style={{ margin: "20px 0" }} />;
 }
 
+function triggerPopunder() {
+  try {
+    const s = document.createElement("script");
+    s.src = "https://pl30424476.effectivecpmnetwork.com/4a/47/fb/4a47fb8e6992d60e29b9c6a9775bb043.js";
+    document.body.appendChild(s);
+  } catch { }
+}
+
 export default function App() {
   const [lang, setLang] = useState("EN");
   const [showLangMenu, setShowLangMenu] = useState(false);
@@ -397,6 +405,7 @@ export default function App() {
   async function handleFind() {
     if (!query.trim() || loading) return;
     if (!premium && remaining <= 0) { setShowPaywall(true); return; }
+    if (!premium) triggerPopunder();
 
     setLoading(true);
     setResults(null);
