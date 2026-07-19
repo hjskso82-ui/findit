@@ -666,12 +666,8 @@ Give 3-5 matches ordered by likelihood. Respond in ${LANGS[lang].name}.`,
                 borderRadius: 12, padding: "13px 16px", fontSize: 13, color: "#8888AA", lineHeight: 1.6,
               }}>💡 {results.tips}</div>
             )}
-            {!premium && (
-              <>
-                <NativeBanner />
-                <AdBanner />
-              </>
-            )}
+            <NativeBanner />
+            <AdBanner />
             <p style={{ textAlign: "center", fontSize: 11, color: "#FFFFFF22", marginTop: 18 }}>{t.disclaimer}</p>
           </div>
         )}
